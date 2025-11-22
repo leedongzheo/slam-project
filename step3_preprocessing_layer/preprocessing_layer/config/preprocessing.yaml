@@ -1,0 +1,18 @@
+preprocessing_layer_node:
+  ros__parameters:
+    depth_image_topic: "/sensor_layer/depth/image_raw"
+    depth_info_topic: "/sensor_layer/depth/camera_info"
+    output_namespace: "/preprocessing_layer"
+    base_frame: "base_link"
+    voxel_size: 0.04
+    min_z: 0.15
+    max_z: 2.0
+    outlier_min_points: 3
+    laser_min_height: -0.05
+    laser_max_height: 0.05
+    laser_angle_min: -3.14
+    laser_angle_max: 3.14
+    laser_angle_increment: 0.01
+    laser_range_min: 0.1
+    laser_range_max: 10.0
+    status_publish_period: 2.0

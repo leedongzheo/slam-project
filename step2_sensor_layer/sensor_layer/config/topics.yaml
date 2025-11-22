@@ -1,0 +1,11 @@
+sensor_layer_node:
+  ros__parameters:
+    color_image_topic: "/camera/color/image_raw"
+    depth_image_topic: "/camera/depth/image_raw"
+    color_info_topic: "/camera/color/camera_info"
+    depth_info_topic: "/camera/depth/camera_info"
+    odom_topic: "/odom"
+    imu_topic: "/imu"
+    output_namespace: "/sensor_layer"
+    status_publish_period: 2.0
+    enable_imu: true
