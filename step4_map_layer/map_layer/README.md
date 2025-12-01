@@ -44,6 +44,7 @@ source install/setup.bash
    ```bash
    ros2 run map_layer gmapping_node
    ```
+   The node enables `use_sim_time` by default so TF lookups align with Gazebo's `/clock`; override with `--ros-args -p use_sim_time:=false` when running on real hardware
 4. **Visualize the map in RViz2:**
    - Set `Fixed Frame` to `map`.
    - Add `Map` display subscribing to `/map`.
