@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import math
 from typing import List
-
+from rclpy.exceptions import ParameterAlreadyDeclaredException
+from rclpy.parameter import Parameter
 import numpy as np
 import rclpy
 from geometry_msgs.msg import PoseArray, Pose, Quaternion
@@ -21,11 +22,16 @@ class GMappingNode(Node):
 
     def __init__(self) -> None:
         super().__init__("python_gmapping")
+        try:
+            self.declare_parameter("use_sim_time", True)
+        except ParameterAlreadyDeclaredException:
+            current = self.get_parameter("use_sim_time")
+            if current.type_ == Parameter.Type.NOT_SET:
+                self.set_parameters([Parameter("use_sim_time", Parameter.Type.BOOL, True)])
         self.frame_odom = "odom"
         self.frame_base = "base_footprint"
         self.frame_map = "map"
         self.queue_size = 5
-        self.declare_parameter("use_sim_time", True)
         
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
