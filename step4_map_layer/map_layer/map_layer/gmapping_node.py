@@ -25,7 +25,8 @@ class GMappingNode(Node):
         self.frame_base = "base_footprint"
         self.frame_map = "map"
         self.queue_size = 5
-
+        self.declare_parameter("use_sim_time", True)
+        
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.slam = GMapping()
