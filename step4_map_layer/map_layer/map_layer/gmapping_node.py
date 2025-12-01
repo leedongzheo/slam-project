@@ -52,13 +52,26 @@ class GMappingNode(Node):
                 transform_time,
                 timeout=Duration(seconds=0.5),
             )
-            trans = tf_msg.transform.translation
-            rot = tf_msg.transform.rotation
-            yaw = self._yaw_from_quaternion([rot.x, rot.y, rot.z, rot.w])
-            odom_pose = (trans.x, trans.y, yaw)
-        except Exception as exc:  # noqa: BLE001
-            self.get_logger().warn(f"TF lookup failed: {exc}")
-            return
+        except Exception as timed_exc:  # noqa: BLE001
+            if "future" in str(timed_exc).lower():
+                try:
+                    transform_time = Time()
+                    tf_msg = self.tf_buffer.lookup_transform(
+                        self.frame_odom,
+                        scan.header.frame_id,
+                        transform_time,
+                        timeout=Duration(seconds=0.5),
+                    )
+                except Exception as fallback_exc:  # noqa: BLE001
+                    self.get_logger().warn(f"TF lookup failed: {fallback_exc}")
+                    return
+            else:
+                self.get_logger().warn(f"TF lookup failed: {timed_exc}")
+                return
+        trans = tf_msg.transform.translation
+        rot = tf_msg.transform.rotation
+        yaw = self._yaw_from_quaternion([rot.x, rot.y, rot.z, rot.w])
+        odom_pose = (trans.x, trans.y, yaw)
 
         self.slam.predict(odom_pose)
         self.slam.update(scan.ranges)
