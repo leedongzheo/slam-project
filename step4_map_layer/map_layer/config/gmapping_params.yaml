@@ -1,0 +1,20 @@
+map_layer:
+  ros__parameters:
+    use_sim_time: true
+    scan_topic: /preprocessing_layer/scan
+    base_frame: base_link
+    odom_frame: odom
+    map_frame: map
+    map_update_interval: 2.0
+
+    num_particles: 30
+    resample_threshold: 0.5
+
+    srr: 0.1
+    srt: 0.2
+    str: 0.1
+    stt: 0.2
+
+    max_range: 5.0
+    sigma_hit: 0.2
+    resolution: 0.05
