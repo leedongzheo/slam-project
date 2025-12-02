@@ -53,7 +53,7 @@ class GMappingNode(Node):
                 timeout=Duration(seconds=0.5),
             )
         except Exception as timed_exc:  # noqa: BLE001
-            if "future" in str(timed_exc).lower():
+            if any(keyword in str(timed_exc).lower() for keyword in ["future", "past", "extrapolation"]):
                 try:
                     transform_time = Time()
                     tf_msg = self.tf_buffer.lookup_transform(
@@ -72,12 +72,38 @@ class GMappingNode(Node):
         rot = tf_msg.transform.rotation
         yaw = self._yaw_from_quaternion([rot.x, rot.y, rot.z, rot.w])
         odom_pose = (trans.x, trans.y, yaw)
-
+        
         self.slam.predict(odom_pose)
         self.slam.update(scan.ranges)
         self._publish_map(scan)
         self._publish_particles(scan)
+    def _publish_tf(self, odom_pose: Tuple[float, float, float], stamp) -> None:
+        best = self.slam.best_particle().pose
+        map_x, map_y, map_yaw = best
+        odom_x, odom_y, odom_yaw = odom_pose
 
+        map_to_odom_yaw = map_yaw - odom_yaw
+        cos_mo = math.cos(map_to_odom_yaw)
+        sin_mo = math.sin(map_to_odom_yaw)
+        rot_odom = (
+            cos_mo * odom_x - sin_mo * odom_y,
+            sin_mo * odom_x + cos_mo * odom_y,
+        )
+        trans_x = map_x - rot_odom[0]
+        trans_y = map_y - rot_odom[1]
+
+        transform = TransformStamped()
+        transform.header.stamp = stamp
+        transform.header.frame_id = self.frame_map
+        transform.child_frame_id = self.frame_odom
+        transform.transform.translation.x = trans_x
+        transform.transform.translation.y = trans_y
+        transform.transform.translation.z = 0.0
+        transform.transform.rotation = geometry_quaternion(map_to_odom_yaw)
+
+        self.tf_broadcaster.sendTransform(transform)
+
+    
     def _publish_map(self, scan: LaserScan) -> None:
         best = self.slam.best_particle()
         occ_prob = (best.grid.occupancy_probability() * 100.0).astype(np.int8)
@@ -121,6 +147,11 @@ def geometry_pose(pose) -> Pose:
     msg.orientation = q
     return msg
 
+def geometry_quaternion(theta: float) -> Quaternion:
+    q = Quaternion()
+    q.z = math.sin(theta / 2)
+    q.w = math.cos(theta / 2)
+    return q
 
 def main() -> None:
     rclpy.init()
