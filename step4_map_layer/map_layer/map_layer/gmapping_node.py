@@ -2,23 +2,21 @@ from __future__ import annotations
 
 import math
 from typing import List, Tuple
-from rclpy.exceptions import ParameterAlreadyDeclaredException
-from rclpy.parameter import Parameter
+
 import numpy as np
 import rclpy
-from rclpy.exceptions import ParameterAlreadyDeclaredException
-from geometry_msgs.msg import PoseArray, Pose, Quaternion
-from nav_msgs.msg import OccupancyGrid as RosOccupancyGrid
+from geometry_msgs.msg import Pose, PoseArray, Quaternion, TransformStamped
+from nav_msgs.msg import MapMetaData, OccupancyGrid as RosOccupancyGrid
 from rclpy.duration import Duration
+from rclpy.exceptions import ParameterAlreadyDeclaredException
 from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import LaserScan
-from tf2_ros import Buffer, TransformListener
-from rclpy.parameter import Parameter
-from geometry_msgs.msg import TransformStamped
 from tf2_ros import Buffer, TransformBroadcaster, TransformListener
 
 from .gmapping import GMapping
+from .motion_model import DifferentialDriveMotionModel
+from .sensor_model import LikelihoodFieldSensorModel
 
 
 class GMappingNode(Node):
@@ -26,24 +24,44 @@ class GMappingNode(Node):
 
     def __init__(self) -> None:
         super().__init__("python_gmapping")
-        try:
-            self.declare_parameter("use_sim_time", True)
-        except ParameterAlreadyDeclaredException:
-            current = self.get_parameter("use_sim_time")
-            if current.type_ == Parameter.Type.NOT_SET:
-                self.set_parameters([Parameter("use_sim_time", Parameter.Type.BOOL, True)])
-        self.frame_odom = "odom"
-        self.frame_base = "base_footprint"
-        self.frame_map = "map"
+        self._declare_default_parameter("use_sim_time", True)
+        self.scan_topic = self._declare_default_parameter("scan_topic", "/preprocessing_layer/scan")
+        self.frame_base = self._declare_default_parameter("base_frame", "base_link")
+        self.frame_odom = self._declare_default_parameter("odom_frame", "odom")
+        self.frame_map = self._declare_default_parameter("map_frame", "map")
+        self.map_update_interval = float(self._declare_default_parameter("map_update_interval", 2.0))
         self.queue_size = 5
-        
+
+        num_particles = int(self._declare_default_parameter("num_particles", 30))
+        resample_threshold = float(self._declare_default_parameter("resample_threshold", 0.5))
+        map_resolution = float(self._declare_default_parameter("resolution", 0.05))
+        max_range = float(self._declare_default_parameter("max_range", 5.0))
+        sigma_hit = float(self._declare_default_parameter("sigma_hit", 0.2))
+
+        srr = float(self._declare_default_parameter("srr", 0.1))
+        srt = float(self._declare_default_parameter("srt", 0.2))
+        str_ = float(self._declare_default_parameter("str", 0.1))
+        stt = float(self._declare_default_parameter("stt", 0.2))
+
+        motion_model = DifferentialDriveMotionModel(alpha1=srr, alpha2=srt, alpha3=str_, alpha4=stt)
+        sensor_model = LikelihoodFieldSensorModel(sigma_hit=sigma_hit, max_range=max_range)
+
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.tf_broadcaster = TransformBroadcaster(self)
-        self.slam = GMapping()
+        self.slam = GMapping(
+            num_particles=num_particles,
+            resample_threshold=resample_threshold,
+            map_resolution=map_resolution,
+            motion_model=motion_model,
+            sensor_model=sensor_model,
+            max_range=max_range,
+        )
         self.map_pub = self.create_publisher(RosOccupancyGrid, "map", self.queue_size)
+        self.map_metadata_pub = self.create_publisher(MapMetaData, "map_metadata", 1)
         self.particles_pub = self.create_publisher(PoseArray, "gmapping_particles", 1)
-        self.create_subscription(LaserScan, "scan", self._scan_callback, self.queue_size)
+        self.create_subscription(LaserScan, self.scan_topic, self._scan_callback, self.queue_size)
+        self._last_map_publish: Time | None = None
 
     def _scan_callback(self, scan: LaserScan) -> None:
         if self.slam.map_angles is None:
@@ -81,8 +99,8 @@ class GMappingNode(Node):
         self.slam.predict(odom_pose)
         self.slam.update(scan.ranges)
         self._publish_tf(odom_pose, scan.header.stamp)
-        self._publish_map(scan)
         self._publish_particles(scan)
+        self._maybe_publish_map(scan)
     def _publish_tf(self, odom_pose: Tuple[float, float, float], stamp) -> None:
         best = self.slam.best_particle().pose
         map_x, map_y, map_yaw = best
@@ -110,20 +128,34 @@ class GMappingNode(Node):
         self.tf_broadcaster.sendTransform(transform)
 
     
-    def _publish_map(self, scan: LaserScan) -> None:
-        best = self.slam.best_particle()
-        occ_prob = (best.grid.occupancy_probability() * 100.0).astype(np.int8)
-        msg = RosOccupancyGrid()
-        msg.header.stamp = scan.header.stamp
-        msg.header.frame_id = self.frame_map
-        msg.info.resolution = best.grid.resolution
-        msg.info.width = best.grid.size_x
-        msg.info.height = best.grid.size_y
-        msg.info.origin.position.x = best.grid.origin[0]
-        msg.info.origin.position.y = best.grid.origin[1]
-        msg.info.origin.orientation.w = 1.0
-        msg.data = occ_prob.flatten().tolist()
-        self.map_pub.publish(msg)
+    def _maybe_publish_map(self, scan: LaserScan) -> None:
+        stamp_time = Time.from_msg(scan.header.stamp)
+        if self._last_map_publish is None:
+            elapsed = None
+        else:
+            elapsed = stamp_time - self._last_map_publish
+
+        if elapsed is None or elapsed > Duration(seconds=self.map_update_interval):
+            best = self.slam.best_particle()
+            occ_prob = (best.grid.occupancy_probability() * 100.0).astype(np.int8)
+            metadata = MapMetaData()
+            metadata.map_load_time = scan.header.stamp
+            metadata.resolution = best.grid.resolution
+            metadata.width = best.grid.size_x
+            metadata.height = best.grid.size_y
+            metadata.origin.position.x = best.grid.origin[0]
+            metadata.origin.position.y = best.grid.origin[1]
+            metadata.origin.orientation.w = 1.0
+
+            msg = RosOccupancyGrid()
+            msg.header.stamp = scan.header.stamp
+            msg.header.frame_id = self.frame_map
+            msg.info = metadata
+            msg.data = occ_prob.flatten().tolist()
+
+            self.map_pub.publish(msg)
+            self.map_metadata_pub.publish(metadata)
+            self._last_map_publish = stamp_time
 
     def _publish_particles(self, scan: LaserScan) -> None:
         poses = PoseArray()
@@ -140,6 +172,13 @@ class GMappingNode(Node):
         siny_cosp = 2 * (w * z + x * y)
         cosy_cosp = 1 - 2 * (y * y + z * z)
         return math.atan2(siny_cosp, cosy_cosp)
+
+    def _declare_default_parameter(self, name: str, default_value):
+        try:
+            self.declare_parameter(name, default_value)
+        except ParameterAlreadyDeclaredException:
+            pass
+        return self.get_parameter(name).value
 
 
 def geometry_pose(pose) -> Pose:
@@ -165,7 +204,3 @@ def main() -> None:
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
-
-
-if __name__ == "__main__":
-    main()
