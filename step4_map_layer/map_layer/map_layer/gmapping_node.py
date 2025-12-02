@@ -71,44 +71,10 @@ class GMappingNode(Node):
 
         try:
             transform_time = Time.from_msg(scan.header.stamp)
-            if not self.tf_buffer.can_transform(
-                self.frame_odom,
-                scan.header.frame_id,
-                transform_time,
-                timeout=Duration(seconds=self.tf_timeout),
-            ):
-                if not self._warned_tf_failure:
-                    self.get_logger().warn(
-                        "Missing TF from %s to %s. Make sure odometry/robot_state_publisher "
-                        "are running (e.g., turtlebot3_gazebo + sensor/preprocessing layers)."
-                        % (self.frame_odom, scan.header.frame_id)
-                    )
-                    self._warned_tf_failure = True
-                return
-            tf_msg = self.tf_buffer.lookup_transform(
-                self.frame_odom,
-                scan.header.frame_id,
-                transform_time,
-                timeout=Duration(seconds=self.tf_timeout),
-            )
-            self._warned_tf_failure = False
+            tf_msg = self._lookup_transform_with_fallback(transform_time, scan.header.frame_id)
         except Exception as timed_exc:  # noqa: BLE001
-            if any(keyword in str(timed_exc).lower() for keyword in ["future", "past", "extrapolation"]):
-                try:
-                    transform_time = Time()
-                    tf_msg = self.tf_buffer.lookup_transform(
-                        self.frame_odom,
-                        scan.header.frame_id,
-                        transform_time,
-                        timeout=Duration(seconds=self.tf_timeout),
-                    )
-                    self._warned_tf_failure = False
-                except Exception as fallback_exc:  # noqa: BLE001
-                    self.get_logger().warn(f"TF lookup failed: {fallback_exc}")
-                    return
-            else:
-                self.get_logger().warn(f"TF lookup failed: {timed_exc}")
-                return
+            self.get_logger().warn(f"TF lookup failed: {timed_exc}")
+            return
         trans = tf_msg.transform.translation
         rot = tf_msg.transform.rotation
         yaw = self._yaw_from_quaternion([rot.x, rot.y, rot.z, rot.w])
@@ -197,6 +163,40 @@ class GMappingNode(Node):
         except ParameterAlreadyDeclaredException:
             pass
         return self.get_parameter(name).value
+
+    def _lookup_transform_with_fallback(self, transform_time: Time, laser_frame: str) -> TransformStamped:
+        try:
+            tf_msg = self.tf_buffer.lookup_transform(
+                self.frame_odom,
+                laser_frame,
+                transform_time,
+                timeout=Duration(seconds=self.tf_timeout),
+            )
+            self._warned_tf_failure = False
+            return tf_msg
+        except Exception as timed_exc:  # noqa: BLE001
+            # If TF is delayed beyond the scan timestamp, fall back to the latest transform
+            # instead of dropping the scan outright. This handles cases where TF publishers
+            # are running but the timestamps lag (e.g., bag playback or slow sim clocks).
+            try:
+                tf_msg = self.tf_buffer.lookup_transform(
+                    self.frame_odom,
+                    laser_frame,
+                    Time(),
+                    timeout=Duration(seconds=self.tf_timeout),
+                )
+                self._warned_tf_failure = False
+                return tf_msg
+            except Exception as fallback_exc:  # noqa: BLE001
+                if not self._warned_tf_failure:
+                    self.get_logger().warn(
+                        "TF missing or delayed from %s to %s (scan time %.3f). Check odometry "
+                        "publisher, robot_state_publisher, and /clock synchronization. "
+                        "Last errors: %s | %s"
+                        % (self.frame_odom, laser_frame, transform_time.nanoseconds * 1e-9, timed_exc, fallback_exc)
+                    )
+                    self._warned_tf_failure = True
+                raise
 
 
 def geometry_pose(pose) -> Pose:

@@ -45,7 +45,7 @@ source install/setup.bash
    ros2 run map_layer gmapping_node
    ```
    The node enables `use_sim_time` by default so TF lookups align with Gazebo's `/clock`; override with `--ros-args -p use_sim_time:=false` when running on real hardware. If your `/preprocessing_layer/scan` timestamps are slightly ahead of or behind the TF buffer, the node will fall back to the latest available transform to avoid extrapolation warnings in either direction. The node also publishes the `map -> odom` transform so RViz can use `map` as the fixed frame without TF errors.
-   If you see a warning about a missing transform from `odom` to the scan frame, make sure the odometry publisher (e.g., `turtlebot3_gazebo`/`diff_drive_controller`) and `robot_state_publisher` are running so that an `odom -> base_link -> <laser_frame>` tree exists.
+   If you see a warning about a missing or delayed transform from `odom` to the scan frame, make sure the odometry publisher (e.g., `turtlebot3_gazebo`/`diff_drive_controller`) and `robot_state_publisher` are running so that an `odom -> base_link -> <laser_frame>` tree exists. A `tf2_monitor odom base_link` output that shows "<no authority available>" with large average delay means transforms are arriving slowly; either let the simulation run a few seconds to fill the buffer or raise `tf_timeout` in `config/gmapping_params.yaml`.
 4. **Visualize the map in RViz2:**
    - Set `Fixed Frame` to `map`.
    - Add `Map` display subscribing to `/map`.
