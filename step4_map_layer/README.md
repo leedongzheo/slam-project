@@ -4,13 +4,7 @@ This step provides a **from-scratch Python reimplementation of GMapping** that l
 
 - The `map_layer` package contains modular building blocks (motion model, sensor model, occupancy grid, particle filter, resampler) plus a ROS 2 node that publishes `/map` and `/gmapping_particles` from `/scan` and TF.
 - See [`map_layer/README.md`](./map_layer/README.md) for detailed build instructions, algorithm explanation, and a demo recipe on TurtleBot3 with ROS 2 Jazzy and Gazebo Harmonic.
-
-# Map Layer (Python GMapping)
-
-The **Map Layer** is the fourth stage in the perception pipeline. It implements a **Particle Filter SLAM (GMapping)** algorithm entirely in Python. This layer consumes the processed LaserScan from the **Preprocessing Layer** to build a global occupancy grid map and estimate the robot's pose within it.
-
-Unlike the standard `slam_gmapping` (C++ wrapper), this implementation exposes the inner workings of the **Rao-Blackwellized Particle Filter**, including motion updates, scan matching via likelihood fields, and resampling steps.
-
+  
 ## Pipeline Integration
 
 This layer sits directly downstream of the Preprocessing Layer:
