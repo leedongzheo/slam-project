@@ -38,6 +38,7 @@ class GMapping:
             size_y=self.map_size[1],
             origin=self.map_origin,
         )
+        self.sensor_model.max_range = self.max_range
         self.particles = [Particle(pose=(0.0, 0.0, 0.0), weight=1.0, grid=grid_template.copy()) for _ in range(self.num_particles)]
         self.map_angles = None
 
