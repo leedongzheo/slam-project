@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import math
-from typing import List
+from typing import List, Tuple
 from rclpy.exceptions import ParameterAlreadyDeclaredException
 from rclpy.parameter import Parameter
 import numpy as np
 import rclpy
+from rclpy.exceptions import ParameterAlreadyDeclaredException
 from geometry_msgs.msg import PoseArray, Pose, Quaternion
 from nav_msgs.msg import OccupancyGrid as RosOccupancyGrid
 from rclpy.duration import Duration
@@ -13,6 +14,9 @@ from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import LaserScan
 from tf2_ros import Buffer, TransformListener
+from rclpy.parameter import Parameter
+from geometry_msgs.msg import TransformStamped
+from tf2_ros import Buffer, TransformBroadcaster, TransformListener
 
 from .gmapping import GMapping
 
@@ -35,6 +39,7 @@ class GMappingNode(Node):
         
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.tf_broadcaster = TransformBroadcaster(self)
         self.slam = GMapping()
         self.map_pub = self.create_publisher(RosOccupancyGrid, "map", self.queue_size)
         self.particles_pub = self.create_publisher(PoseArray, "gmapping_particles", 1)
@@ -75,6 +80,7 @@ class GMappingNode(Node):
         
         self.slam.predict(odom_pose)
         self.slam.update(scan.ranges)
+        self._publish_tf(odom_pose, scan.header.stamp)
         self._publish_map(scan)
         self._publish_particles(scan)
     def _publish_tf(self, odom_pose: Tuple[float, float, float], stamp) -> None:
