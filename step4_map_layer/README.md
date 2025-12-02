@@ -110,8 +110,10 @@ Ensure the simulation and preprocessing layers are running:
 ```bash
 # Terminal 1: Gazebo World
 ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+# Terminal 2:
+ros2 launch sensor_layer sensor_layer.launch.py
 
-# Terminal 2: Preprocessing Layer (Generates the scan)
+# Terminal 3: Preprocessing Layer (Generates the scan)
 ros2 launch preprocessing_layer preprocessing_layer.launch.py
 ```
 
