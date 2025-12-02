@@ -9,7 +9,7 @@ This folder reimplements the core ideas of the **GMapping** algorithm in pure Py
   - `sensor_model.py` – likelihood-field beam model using occupancy probabilities.
   - `occupancy_grid.py` – log-odds grid with Bresenham ray-casting for scan insertion.
   - `resampler.py` – systematic low-variance resampling.
-  - `gmapping_node.py` – ROS 2 node that consumes `/scan` and publishes `/map` plus particle poses.
+- `gmapping_node.py` – ROS 2 node that consumes `/preprocessing_layer/scan` and publishes `/map` plus particle poses.
 - `package.xml`, `setup.py`, `setup.cfg`, `resource/map_layer` – ament_python metadata and install layout so `ros2 run` can find the executable under `lib/map_layer`.
 
 ## How the algorithm is built
@@ -39,12 +39,12 @@ source install/setup.bash
    ```bash
    ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
    ```
-2. **Bring up the RGB-D to laser pipeline (from steps 2 & 3):** ensure the depth-to-laser node publishes `/scan` in the same namespace.
+2. **Bring up the RGB-D to laser pipeline (from steps 2 & 3):** ensure the depth-to-laser node publishes `/preprocessing_layer/scan` in the same namespace.
 3. **Launch the Python GMapping node:**
    ```bash
    ros2 run map_layer gmapping_node
    ```
-   The node enables `use_sim_time` by default so TF lookups align with Gazebo's `/clock`; override with `--ros-args -p use_sim_time:=false` when running on real hardware. If your `/scan` timestamps are slightly ahead of or behind the TF buffer, the node will fall back to the latest available transform to avoid extrapolation warnings in either direction. The node also publishes the `map -> odom` transform so RViz can use `map` as the fixed frame without TF errors.
+   The node enables `use_sim_time` by default so TF lookups align with Gazebo's `/clock`; override with `--ros-args -p use_sim_time:=false` when running on real hardware. If your `/preprocessing_layer/scan` timestamps are slightly ahead of or behind the TF buffer, the node will fall back to the latest available transform to avoid extrapolation warnings in either direction. The node also publishes the `map -> odom` transform so RViz can use `map` as the fixed frame without TF errors.
 4. **Visualize the map in RViz2:**
    - Set `Fixed Frame` to `map`.
    - Add `Map` display subscribing to `/map`.
