@@ -47,7 +47,7 @@ The raw point cloud is often noisy or too dense for real-time SLAM. A filtering 
 
 #### (B) Passthrough Filter (Z-axis)
 * **Purpose:** Removes ground noise and upper-ceiling points.
-* **Example Z Limits:** $0.15\ \text{m} < z < 2.0\ \text{m}$.
+* **Example Z Limits:** $-0.1\ \text{m} < z < 1.0\ \text{m}$.
 
 #### (C) Statistical Outlier Removal
 * **Purpose:** Removes sparse noise clusters.
@@ -57,7 +57,7 @@ The raw point cloud is often noisy or too dense for real-time SLAM. A filtering 
 
 | Topic | Message Type | Description |
 | :--- | :--- | :--- |
-| `/camera/points_filtered` | `sensor_msgs/msg/PointCloud2` | Cleaned & filtered point cloud |
+| `/preprocessing_layer/camera/points_filtered` | `sensor_msgs/msg/PointCloud2` | Cleaned & filtered point cloud |
 
 ### Node Implementation
 
@@ -78,7 +78,7 @@ SLAM and navigation algorithms require all perception data to be expressed in th
 
 | Source | Target | Output Topic |
 | :--- | :--- | :--- |
-| `/camera/points_filtered` | `camera_link` → `base_link` | `/points_in_base_link` |
+| `/preprocessing_layer/camera/points_filtered` | `camera_link` → `base_link` | `/preprocessing_layer/points_in_base_link` |
 
 * The transform uses data from `/tf`, `/tf_static`, and the camera mounting geometry defined in the SDF.
 
@@ -105,22 +105,22 @@ For 2D SLAM algorithms such as `gmapping`, `slam_toolbox` (2D mode), or `hector_
 
 | Input | Output | Description |
 | :--- | :--- | :--- |
-| `/points_in_base_link` | `/scan` | 360-degree or 180-degree planar LaserScan |
+| `/preprocessing_layer/points_in_base_link` | `/preprocessing_layer/scan` | 360-degree or 180-degree planar LaserScan |
 
 ### Typical Parameters
 
 | Parameter | Value | Note |
 | :--- | :--- | :--- |
-| `min_height` | $-0.05$ | Min Z value to consider for the planar cut. |
-| `max_height` | $+0.05$ | Max Z value to consider for the planar cut. |
-| `angle_min` | $-3.14$ | Minimum horizontal angle ($-180^\circ$). |
-| `angle_max` | $+3.14$ | Maximum horizontal angle ($+180^\circ$). |
+| `min_height` | $-0.1$ | Min Z value to consider for the planar cut. |
+| `max_height` | $+1.0$ | Max Z value to consider for the planar cut. |
+| `angle_min` | $-0.523$ | Minimum horizontal angle ($-30^\circ$). |
+| `angle_max` | $+0.523$ | Maximum horizontal angle ($+30^\circ$). |
 | `range_min` | $0.1$ | Minimum distance for a valid ray. |
 | `range_max` | $10.0$ | Maximum distance for a valid ray. |
 
 ### Output
 
-The `/scan` topic is now fully compatible with any standard 2D SLAM and navigation system.
+The `/preprocessing_layer/scan` topic is now fully compatible with any standard 2D SLAM and navigation system.
 
 ---
 ## Running the Node
@@ -189,8 +189,8 @@ Run these commands in another terminal while the preprocessing node is active:
 2. **Inspect the point clouds**
    ```bash
    ros2 topic echo --qos-profile sensor_data /preprocessing_layer/camera/depth/points
-   ros2 topic echo --qos-profile sensor_data /camera/points_filtered
-   ros2 topic echo --qos-profile sensor_data /points_in_base_link
+   ros2 topic echo --qos-profile sensor_data /preprocessing_layer/camera/points_filtered
+   ros2 topic echo --qos-profile sensor_data /preprocessing_layer/points_in_base_link
    Or:
    ros2 topic echo /preprocessing_layer/camera/depth/points
    ...
@@ -198,9 +198,9 @@ Run these commands in another terminal while the preprocessing node is active:
 
 3. **Watch the LaserScan**
    ```bash
-   ros2 topic echo --qos-profile sensor_data /scan
+   ros2 topic echo --qos-profile sensor_data /preprocessing_layer/scan
    Or:
-   ros2 topic echo /scan
+   ros2 topic echo /preprocessing_layer/scan
    ```
 
 4. **Check pipeline status**
@@ -208,4 +208,4 @@ Run these commands in another terminal while the preprocessing node is active:
    ros2 topic echo /preprocessing_layer/status
    ```
 
-For visual inspection, you can also open RViz2 and add displays for **PointCloud2** (using `/camera/depth/points`, `/camera/points_filtered`, `/points_in_base_link`) and **LaserScan** (using `/scan`).
+For visual inspection, you can also open RViz2 and add displays for **PointCloud2** (using `/camera/depth/points`, `/preprocessing_layer/camera/points_filtered`, `/preprocessing_layer/points_in_base_link`) and **LaserScan** (using `/preprocessing_layer/scan`).
