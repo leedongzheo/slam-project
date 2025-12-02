@@ -152,9 +152,9 @@ Confirm that depth/image_raw and depth/camera_info are being published with the 
 Check the following topics to verify that each stage is working correctly:
 
 * /preprocessing_layer/camera/depth/points
-* /camera/points_filtered***
-* /points_in_base_link***
-* /scan***
+* /preprocessing_layer/camera/points_filtered***
+* /preprocessing_layer/points_in_base_link***
+* /preprocessing_layer/scan***
 * .../status (progress/debug info)
 ### If You Want to Extend or Customize
 * **Adjust voxel size, Z limits, or outlier thresholds** in the YAML file to balance smoothness vs. processing speed.
@@ -169,18 +169,18 @@ such as angle limits or resolution in the YAML file to better match the SLAM alg
 | Stage | Module | Input | Output |
 | :--- | :--- | :--- | :--- |
 | **1. Depth → PointCloud** | `depth_image_proc` | Depth Image + CameraInfo | `/camera/depth/points` |
-| **2. Filtering** | `pcl_filters` / custom node | Raw PointCloud2 | `/camera/points_filtered` |
-| **3. TF Projection** | `tf2_ros` | Filtered PointCloud2 | `/points_in_base_link` |
-| **4. Cloud → LaserScan ** | `pointcloud_to_laserscan` | TF-aligned PointCloud | `/scan` |
+| **2. Filtering** | `pcl_filters` / custom node | Raw PointCloud2 | `/preprocessing_layer/camera/points_filtered` |
+| **3. TF Projection** | `tf2_ros` | Filtered PointCloud2 | `/preprocessing_layer/points_in_base_link` |
+| **4. Cloud → LaserScan ** | `pointcloud_to_laserscan` | TF-aligned PointCloud | `preprocessing_layer/scan` |
 ---
-## 💡 Conclusion
+##  Conclusion
 
 The Preprocessing Layer transforms raw depth and RGB-D data into optimized, structured, and robot-aligned perception information. It enables both 2D and 3D navigation stacks to operate reliably and forms the foundation for downstream SLAM, obstacle avoidance, and autonomous navigation.
 
 This layer bridges the gap between raw sensor acquisition and high-level perception and mapping systems, ensuring data consistency, performance, and scalability.
 
 ---
-## 🔍 Monitoring the output topics
+##  Monitoring the output topics
 
 Run these commands in another terminal while the preprocessing node is active:
 
