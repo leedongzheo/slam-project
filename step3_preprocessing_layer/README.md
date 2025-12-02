@@ -78,7 +78,7 @@ SLAM and navigation algorithms require all perception data to be expressed in th
 
 | Source | Target | Output Topic |
 | :--- | :--- | :--- |
-| `/preprocessing_layer/camera/points_filtered` | `camera_link` → `base_link` | `/preprocessing_layer/points_in_base_link` |
+| `/preprocessing_layer/camera/points_filtered` | `camera_depth_optical_frame` → `base_link` | `/preprocessing_layer/points_in_base_link` |
 
 * The transform uses data from `/tf`, `/tf_static`, and the camera mounting geometry defined in the SDF.
 
