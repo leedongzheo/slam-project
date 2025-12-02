@@ -29,6 +29,7 @@ class GMappingNode(Node):
         self.frame_base = self._declare_default_parameter("base_frame", "base_link")
         self.frame_odom = self._declare_default_parameter("odom_frame", "odom")
         self.frame_map = self._declare_default_parameter("map_frame", "map")
+        self.tf_timeout = float(self._declare_default_parameter("tf_timeout", 0.5))
         self.map_update_interval = float(self._declare_default_parameter("map_update_interval", 2.0))
         self.queue_size = 5
 
@@ -62,6 +63,7 @@ class GMappingNode(Node):
         self.particles_pub = self.create_publisher(PoseArray, "gmapping_particles", 1)
         self.create_subscription(LaserScan, self.scan_topic, self._scan_callback, self.queue_size)
         self._last_map_publish: Time | None = None
+        self._warned_tf_failure = False
 
     def _scan_callback(self, scan: LaserScan) -> None:
         if self.slam.map_angles is None:
@@ -69,12 +71,28 @@ class GMappingNode(Node):
 
         try:
             transform_time = Time.from_msg(scan.header.stamp)
+            if not self.tf_buffer.can_transform(
+                self.frame_odom,
+                scan.header.frame_id,
+                transform_time,
+                timeout=Duration(seconds=self.tf_timeout),
+            ):
+                if not self._warned_tf_failure:
+                    self.get_logger().warn(
+                        "Missing TF from %s to %s. Make sure odometry/robot_state_publisher "
+                        "are running (e.g., turtlebot3_gazebo + sensor/preprocessing layers).",
+                        self.frame_odom,
+                        scan.header.frame_id,
+                    )
+                    self._warned_tf_failure = True
+                return
             tf_msg = self.tf_buffer.lookup_transform(
                 self.frame_odom,
                 scan.header.frame_id,
                 transform_time,
-                timeout=Duration(seconds=0.5),
+                timeout=Duration(seconds=self.tf_timeout),
             )
+            self._warned_tf_failure = False
         except Exception as timed_exc:  # noqa: BLE001
             if any(keyword in str(timed_exc).lower() for keyword in ["future", "past", "extrapolation"]):
                 try:
@@ -83,8 +101,9 @@ class GMappingNode(Node):
                         self.frame_odom,
                         scan.header.frame_id,
                         transform_time,
-                        timeout=Duration(seconds=0.5),
+                        timeout=Duration(seconds=self.tf_timeout),
                     )
+                    self._warned_tf_failure = False
                 except Exception as fallback_exc:  # noqa: BLE001
                     self.get_logger().warn(f"TF lookup failed: {fallback_exc}")
                     return
