@@ -33,13 +33,6 @@ The first step converts the raw depth image and camera intrinsics into a structu
    * Produces a dense or sparse point cloud depending on depth data availability.
    * Output is a properly formed sensor_msgs/msg/PointCloud2 message.
 
-> **Launch Example:**
-> ```bash
-> ros2 run depth_image_proc point_cloud_xyz
-> ```
-> (typically included in a launch file)
----
-
 ## 2. PointCloud Filtering
 
 **(Voxel Grid, Passthrough, Outlier Removal)**
