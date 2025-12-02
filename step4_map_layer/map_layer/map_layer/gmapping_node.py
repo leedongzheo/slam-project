@@ -80,9 +80,8 @@ class GMappingNode(Node):
                 if not self._warned_tf_failure:
                     self.get_logger().warn(
                         "Missing TF from %s to %s. Make sure odometry/robot_state_publisher "
-                        "are running (e.g., turtlebot3_gazebo + sensor/preprocessing layers).",
-                        self.frame_odom,
-                        scan.header.frame_id,
+                        "are running (e.g., turtlebot3_gazebo + sensor/preprocessing layers)."
+                        % (self.frame_odom, scan.header.frame_id)
                     )
                     self._warned_tf_failure = True
                 return
